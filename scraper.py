@@ -119,7 +119,7 @@ def main():
         current_date = datetime.now().strftime("%d.%m.%Y")
         past_date = (datetime.now() - timedelta(days=365 * 10)).strftime("%d.%m.%Y")
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=15) as executor:
             futures = []
             for code in codes:
                 last_date = last_data_dates.get(code)
