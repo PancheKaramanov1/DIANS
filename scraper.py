@@ -69,9 +69,8 @@ def scrape_for_year_and_prepare_data(code, year, last_data_dates):
     # Check if data already exists for the year
     if code in last_data_dates and last_data_dates[code].year >= year:
         print(f"Data for {code} already exists for {year}. Skipping...")
-        return []  # Skip if data already exists
+        return []
 
-    # Fetch data for the specified year
     from_date = f"01.01.{year}"
     to_date = f"31.12.{year}"
 
@@ -79,13 +78,16 @@ def scrape_for_year_and_prepare_data(code, year, last_data_dates):
     results = []
 
     for entry in data:
+        if float(entry[5].replace(',', '.')) == 0.00:
+            continue 
+
         procedure_data = (
             datetime.strptime(entry[0], "%d%m%Y").strftime("%d%m%Y"),
             float(entry[1].replace(',', '.')) if entry[1] else 0.00,
             float(entry[2].replace(',', '.')) if entry[2] else 0.00,
             float(entry[3].replace(',', '.')) if entry[3] else 0.00,
             float(entry[4].replace(',', '.')) if entry[4] else 0.00,
-            float(entry[5].replace(',', '.')) if entry[5] else 0.00,
+            float(entry[5].replace(',', '.')),
             int(entry[6]) if entry[6] else 0,
             float(entry[7].replace(',', '.')) if entry[7] else 0.00,
             float(entry[8].replace(',', '.')) if entry[8] else 0.00,
