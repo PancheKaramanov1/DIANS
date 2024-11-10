@@ -5,6 +5,7 @@ import psycopg2
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import config
+import time
 
 
 def insert_stock_data(connection, data):
@@ -70,25 +71,25 @@ def scrape_for_year_and_insert(code, year, connection):
     data = scrape_data(code, from_date, to_date)
 
     for entry in data:
-        date = datetime.strptime(entry[0], "%d%m%Y").strftime("%d%m%Y")
-        last_price = float(entry[1].replace(',', '.'))
-        max_price = float(entry[2].replace(',', '.')) if entry[2] else last_price
-        min_price = float(entry[3].replace(',', '.')) if entry[3] else last_price
-        avg_price = float(entry[4].replace(',', '.'))
-        percent_change = float(entry[5].replace(',', '.'))
-        quantity = int(entry[6])
-        best_turnover = float(entry[7].replace(',', '.'))
-        total_turnover = float(entry[8].replace(',', '.'))
-        code = code
-
         procedure_data = (
-            date, last_price, max_price, min_price, avg_price, percent_change, quantity, best_turnover, total_turnover, code
+            entry[0],
+            entry[1],
+            entry[2],
+            entry[3],
+            entry[4],
+            entry[5],
+            entry[6],
+            entry[7],
+            entry[8],
+            code
         )
 
         insert_stock_data(connection, procedure_data)
 
 
 def main():
+
+    start_time = time.time()
     try:
         params = config()
         connection = psycopg2.connect(**params)
@@ -121,6 +122,10 @@ def main():
         if connection:
             connection.close()
             print('Database connection closed.')
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Total execution time: {elapsed_time:.2f} seconds")
 
 
 if __name__ == "__main__":
