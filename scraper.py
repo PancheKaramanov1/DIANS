@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import psycopg2
+from psycopg2 import pool
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import config
@@ -10,18 +11,146 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def insert_stock_data_batch(connection, data_batch):
+connection_pool = None
+
+def initialize_connection_pool():
+    global connection_pool
     try:
-        with connection.cursor() as cursor:
+        params = config()
+        connection_pool = psycopg2.pool.SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            **params
+        )
+        if connection_pool:
+            logger.info("Connection pool created successfully")
+    except Exception as e:
+        logger.error(f"Error creating connection pool: {e}")
+
+def get_connection():
+    return connection_pool.getconn()
+
+def release_connection(conn):
+    connection_pool.putconn(conn)
+
+def close_connection_pool():
+    connection_pool.closeall()
+
+def insert_stock_data_batch(data_batch):
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
             cursor.executemany(
                 'CALL public.populatestockprices(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
                 data_batch
             )
-            connection.commit()
+            conn.commit()
             logger.info(f"Inserted batch of {len(data_batch)} entries.")
     except psycopg2.DatabaseError as error:
         logger.error(f"Error inserting data: {error}")
-        connection.rollback()
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            release_connection(conn)
+
+def get_session_with_retries(retries=3, backoff_factor=0.3, status_forcelist=(500, 502, 504)):
+    session = requests.Session()
+    retry = requests.packages.urllib3.util.retry.Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist
+    )
+    adapter = requests.adapters.HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
+def scrape_data(code, from_date, to_date):
+    session = get_session_with_retries()
+    url = 'https://www.mse.mk/mk/stats/symbolhistory/REPL'
+    data = {
+        'FromDate': from_date,
+        'ToDate': to_date,
+        'Code': code
+    }
+    try:
+        response = session.post(url, data=data, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        table_body = soup.find('tbody')
+
+        if not table_body:
+            return []
+
+        rows = table_body.find_all('tr')
+        results = []
+        for row in rows:
+            cells = row.find_all('td')
+            cell_values = [cell.get_text(strip=True) for cell in cells]
+            cell_values = [value.replace('.', '').replace(',', '.') for value in cell_values]
+            results.append(cell_values)
+
+        return results
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout error for {code}. Skipping...")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error for {code}: {e}")
+    return []
+
+def parse_float(value):
+    try:
+        if not value.strip():
+            return 0.0
+        return float(value.replace(',', '.').replace(' ', ''))
+    except ValueError:
+        logger.warning(f"Unable to parse float value: '{value}' - setting to 0.0")
+        return 0.0
+
+def parse_date(value, date_format="%d%m%Y"):
+    try:
+        return datetime.strptime(value, date_format)
+    except ValueError:
+        logger.warning(f"Invalid date format: {value}")
+        return None
+
+def scrape_for_missing_data(code, last_date):
+    if(last_date == datetime.now().strftime("%Y-%m-%d")):
+        return []
+    
+    results = []
+    current_year = datetime.now().year
+    start_year = last_date.year if last_date else current_year - 10
+
+    for year in range(start_year, current_year + 1):
+        from_date = last_date if last_date else f"01.01.{year}"
+        to_date = f"31.12.{year}" if year < current_year else datetime.now().strftime("%d.%m.%Y")
+        
+        year_data = scrape_data(code, from_date, to_date)
+        
+        for entry in year_data:
+            date_parsed = parse_date(entry[0])
+            if date_parsed is None or parse_float(entry[5]) == 0.00:
+                continue
+
+            procedure_data = (
+                date_parsed.strftime("%d%m%Y"),
+                parse_float(entry[1]),
+                parse_float(entry[2]),
+                parse_float(entry[3]),
+                parse_float(entry[4]),
+                parse_float(entry[5]),
+                int(entry[6]) if entry[6].isdigit() else 0,
+                parse_float(entry[7]),
+                parse_float(entry[8]),
+                code
+            )
+            results.append(procedure_data)
+
+    return results
 
 def get_dropdown_options(soup):
     select_element = soup.find('select', id='Code')
@@ -41,118 +170,36 @@ def get_last_data_dates(connection):
         logger.error(f"Error fetching last data dates: {error}")
         return {}
 
-def scrape_data(code, from_date, to_date):
-    url = 'https://www.mse.mk/mk/stats/symbolhistory/REPL'
-    data = {
-        'FromDate': from_date,
-        'ToDate': to_date,
-        'Code': code
-    }
-    try:
-        response = requests.post(url, data=data, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        table_body = soup.find('tbody')
-
-        if not table_body:
-            return []
-
-        rows = table_body.find_all('tr')
-        results = []
-        for row in rows:
-            cells = row.find_all('td')
-            cell_values = [cell.get_text(strip=True) for cell in cells]
-            cell_values = [value.replace('.', '').replace(',', '.') for value in cell_values]
-            results.append(cell_values)
-
-        return results
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request error for {code}: {e}")
-        return []
-
-def scrape_for_year_and_prepare_data(code, year, last_data_dates):
-    if code in last_data_dates and last_data_dates[code].year >= year:
-        logger.info(f"Data for {code} already exists for {year}. Skipping...")
-        return []
-
-    from_date = f"01.01.{year}"
-    to_date = f"31.12.{year}"
-
-    data = scrape_data(code, from_date, to_date)
-    results = []
-
-    for entry in data:
-        if float(entry[5].replace(',', '.')) == 0.00:
-            continue
-
-        procedure_data = (
-            datetime.strptime(entry[0], "%d%m%Y").strftime("%d%m%Y"),
-            float(entry[1].replace(',', '.')) if entry[1] else 0.00,
-            float(entry[2].replace(',', '.')) if entry[2] else 0.00,
-            float(entry[3].replace(',', '.')) if entry[3] else 0.00,
-            float(entry[4].replace(',', '.')) if entry[4] else 0.00,
-            float(entry[5].replace(',', '.')),
-            int(entry[6]) if entry[6] else 0,
-            float(entry[7].replace(',', '.')) if entry[7] else 0.00,
-            float(entry[8].replace(',', '.')) if entry[8] else 0.00,
-            code
-        )
-        results.append(procedure_data)
-
-    return results
-
 def main():
     start_time = time.time()
+    initialize_connection_pool()
+
     try:
-        params = config()
-        connection = psycopg2.connect(**params)
-        logger.info('Connected to the database')
-
-        url = 'https://www.mse.mk/mk/stats/symbolhistory/REPL'
-        response = requests.get(url, timeout=10)
+        conn = get_connection()
+        response = requests.get('https://www.mse.mk/mk/stats/symbolhistory/REPL', timeout=10)
         soup = BeautifulSoup(response.text, 'html.parser')
-        options = get_dropdown_options(soup)
-        codes = filter_options(options)
+        codes = filter_options(get_dropdown_options(soup))
 
-        last_data_dates = get_last_data_dates(connection)
-
-        current_date = datetime.now().strftime("%d.%m.%Y")
-        past_date = (datetime.now() - timedelta(days=365 * 10)).strftime("%d.%m.%Y")
+        last_data_dates = get_last_data_dates(conn)
+        release_connection(conn)
 
         with ThreadPoolExecutor(max_workers=15) as executor:
-            futures = []
-            for code in codes:
-                last_date = last_data_dates.get(code)
-
-                if not last_date:
-                    logger.info(f"No data for {code}, scraping from past 10 years...")
-                    from_year = 2014
-                else:
-                    logger.info(f"Data exists for {code}, scraping from {last_date + timedelta(days=1)}...")
-                    from_year = (last_date + timedelta(days=1)).year
-
-                for year in range(from_year, datetime.now().year + 1):
-                    futures.append(executor.submit(scrape_for_year_and_prepare_data, code, year, last_data_dates))
+            futures = [
+                executor.submit(scrape_for_missing_data, code, last_data_dates.get(code))
+                for code in codes
+            ]
 
             for future in as_completed(futures):
-                try:
-                    data_batch = future.result()
-                    if data_batch:
-                        insert_stock_data_batch(connection, data_batch)
-                except Exception as e:
-                    logger.error(f"Error in scraping or inserting data: {e}")
+                data_batch = future.result()
+                if data_batch:
+                    insert_stock_data_batch(data_batch)
 
     except Exception as e:
-        logger.error(f"Error connecting to the database: {e}")
+        logger.error(f"Error in main process: {e}")
     finally:
-        if connection:
-            connection.close()
-            logger.info('Database connection closed.')
-
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    logger.info(f"Total execution time: {elapsed_time:.2f} seconds")
-
+        close_connection_pool()
+        end_time = time.time()
+        logger.info(f"Total execution time: {end_time - start_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()
