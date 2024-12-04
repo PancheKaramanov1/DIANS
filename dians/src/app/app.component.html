@@ -16,7 +16,12 @@
     </thead>
     <tbody>
       <tr *ngFor="let item of data">
-        <td>{{ item.code }}</td>
+        <!-- Add a routerLink to navigate when the button is clicked -->
+        <td>
+          <button class="code-button" [routerLink]="['/other-component']">
+            {{ item.code }}
+          </button>
+        </td>
         <td>{{ item.last_price }}</td>
         <td>{{ item.date | date: 'yyyy-MM-dd HH:mm:ss' }}</td>
         <td>{{ item.quantity }}</td>

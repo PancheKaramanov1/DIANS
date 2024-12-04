@@ -1,20 +1,12 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { AppComponent } from './app.component';
-import { provideHttpClient, withFetch } from '@angular/common/http'; // <-- Add this import
-import { DataService } from './data.service'; // <-- Ensure DataService is imported
+import { AppRoutingModule } from './app-routing.module'; // Import the routing module
 
 @NgModule({
-  declarations: [
-    AppComponent
-  ],
-  imports: [
-    BrowserModule,
-  ],
-  providers: [
-    DataService,
-    provideHttpClient(withFetch())
-  ], // Ensure DataService is provided
-  bootstrap: [AppComponent]
+  declarations: [AppComponent],
+  imports: [BrowserModule, AppRoutingModule],  // Add AppRoutingModule here
+  providers: [],
+  bootstrap: [AppComponent],
 })
-export class AppModule { }
+export class AppModule {}
