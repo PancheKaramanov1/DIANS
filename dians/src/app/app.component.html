@@ -1,1 +1,32 @@
-<p> Hello World</p>
+<div *ngIf="errorMessage" class="error-message">
+  {{ errorMessage }}
+</div>
+
+<div *ngIf="!errorMessage && data.length > 0">
+  <table>
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Last Price</th>
+        <th>Date</th>
+        <th>Quantity</th>
+        <th>Best Turnover</th>
+        <th>Percent Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let item of data">
+        <td>{{ item.code }}</td>
+        <td>{{ item.last_price }}</td>
+        <td>{{ item.date | date: 'yyyy-MM-dd HH:mm:ss' }}</td>
+        <td>{{ item.quantity }}</td>
+        <td>{{ item.best_turnover }}</td>
+        <td>{{ item.percent_change }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div *ngIf="!errorMessage && data.length === 0">
+  No data available.
+</div>
