@@ -37,8 +37,8 @@ export class AppComponent implements OnInit {
 
   openCodePopup(code: string): void {
     const dialogRef = this.dialog.open(CodePopupComponent, {
-      width: '600px',
-      height: '600px',  
+      width: '1000px',
+      height: '600px',
       data: { code }
     });
 

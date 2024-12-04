@@ -26,6 +26,7 @@ export class CodePopupComponent {
   }
 
   fetchDataForCode(code: string): void {
+    console.log(this.dataService.getDataForCode(code));
     this.dataService.getDataForCode(code).subscribe({
       next: (response) => {
         this.data = response;
@@ -35,6 +36,7 @@ export class CodePopupComponent {
         this.errorMessage = 'There was an error fetching the data for the code.';
       }
     });
+    console.log(this.data);
   }
 
   closeDialog(): void {

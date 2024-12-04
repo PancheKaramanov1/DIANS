@@ -8,7 +8,7 @@ import { Observable } from 'rxjs';
 })
 export class DataService {
   private apiUrl = 'http://localhost:3000/api/get-latest';
-  private apiUrl1 = 'http://localhost:3001/api/get-latest';
+  private apiUrl1 = 'http://localhost:3001/data';
 
   constructor(private http: HttpClient) {}
 
@@ -18,7 +18,9 @@ export class DataService {
   }
 
   getDataForCode(code: string): Observable<any> {
-    console.log('Fetching data from:', this.apiUrl1);
-    return this.http.get<any>(`${this.apiUrl1}/${code}`);
+    console.log('Fetching data from:', `${this.apiUrl1}/${code}`);
+    const result = this.http.get<any>(`${this.apiUrl1}/${code}`);
+    console.log(result);
+    return result;
   }
 }
