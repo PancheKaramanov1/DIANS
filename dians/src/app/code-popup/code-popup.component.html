@@ -1,0 +1,41 @@
+<div *ngIf="errorMessage" class="error-message">
+    {{ errorMessage }}
+  </div>
+  
+  <div *ngIf="!errorMessage && data.length > 0">
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Last Price</th>
+          <th>Date</th>
+          <th>Quantity</th>
+          <th>Best Turnover</th>
+          <th>Total Turnover</th>
+          <th>Max</th>
+          <th>Min</th>
+          <th>Average Price</th>
+          <th>Percent Change</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of data">
+          <td>{{ item.code }}</td>
+          <td>{{ item.last_price }}</td>
+          <td>{{ item.date }}</td>
+          <td>{{ item.quantity }}</td>
+          <td>{{ item.best_turnover }}</td>
+          <td>{{ item.total_turnover }}</td>
+          <td>{{ item.max }}</td>
+          <td>{{ item.min }}</td>
+          <td>{{ item.average_price }}</td>
+          <td>{{ item.percent_change }}%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <div *ngIf="!errorMessage && data.length === 0">
+    No data available.
+  </div>
+  

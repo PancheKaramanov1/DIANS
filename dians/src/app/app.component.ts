@@ -1,11 +1,17 @@
 import { Component, OnInit } from '@angular/core';
 import { DataService } from './data.service';
+import { MatDialog } from '@angular/material/dialog'; // Import MatDialog
 import { Router } from '@angular/router'; // Import Router
+import { CodePopupComponent } from './code-popup/code-popup.component'; // Import the Popup Component
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css'],
+  imports: [
+    CommonModule,  // Add this to imports
+  ]
 })
 export class AppComponent implements OnInit {
   data: any[] = [];
@@ -13,6 +19,7 @@ export class AppComponent implements OnInit {
 
   constructor(
     private dataService: DataService,
+    private dialog: MatDialog, // Inject MatDialog
     private router: Router  // Inject Router
   ) {}
 
@@ -28,8 +35,17 @@ export class AppComponent implements OnInit {
     });
   }
 
-  navigateToOtherComponent(code: string): void {
-    // Navigate to 'other-component' with the code as a parameter (optional)
-    this.router.navigate(['/other-component', code]);
+  openCodePopup(code: string): void {
+    const dialogRef = this.dialog.open(CodePopupComponent, {
+      width: '600px',
+      height: '600px',  
+      data: { code }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        console.log('Dialog closed with result:', result);
+      }
+    });
   }
 }

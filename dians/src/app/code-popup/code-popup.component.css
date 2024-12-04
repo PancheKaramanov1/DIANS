@@ -1,0 +1,9 @@
+.error-message {
+    color: red;
+    font-weight: bold;
+  }
+  
+  mat-dialog-content {
+    padding: 10px;
+  }
+  
