@@ -8,7 +8,8 @@ import { Observable } from 'rxjs';
 })
 export class DataService {
   private apiUrl = 'http://localhost:3000/api/get-latest';
-  private apiUrl1 = 'http://localhost:3001/data';
+  private apiUrl1 = 'http://localhost:3001/stock-analysis';
+  private apiUrl2 = 'http://localhost:3003/analyze-stock';
 
   constructor(private http: HttpClient) {}
 
@@ -17,10 +18,19 @@ export class DataService {
     return this.http.get<any[]>(this.apiUrl);
   }
 
-  getDataForCode(code: string): Observable<any> {
-    console.log('Fetching data from:', `${this.apiUrl1}/${code}`);
-    const result = this.http.get<any>(`${this.apiUrl1}/${code}`);
+  getDataForCode(code: string, date?: Date): Observable<any> {
+    console.log('Fetching data from:', `${this.apiUrl1}/${code}`, { date });
+    let params: any = {};
+    if (date) {
+      params.date = date;
+    }
+    const result = this.http.get<any>(`${this.apiUrl1}/${code}`, { params });
     console.log(result);
     return result;
+  }
+
+  getNewsForCode(code: string): Observable<any> {
+    console.log('Fetching news from:', `${this.apiUrl2}/${code}`);
+    return this.http.get<any>(`${this.apiUrl2}/${code}`);
   }
 }

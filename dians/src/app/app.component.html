@@ -2,6 +2,20 @@
   {{ errorMessage }}
 </div>
 
+<div>
+  <button (click)="runPythonScript()">Run Python Script</button>
+</div>
+
+<div *ngIf="scriptOutput">
+  <h3>Script Output:</h3>
+  <pre>{{ scriptOutput }}</pre>
+</div>
+
+<div *ngIf="errorMessage">
+  <h3>Error:</h3>
+  <p>{{ errorMessage }}</p>
+</div>
+
 <div *ngIf="!errorMessage && data.length > 0">
   <table>
     <thead>
